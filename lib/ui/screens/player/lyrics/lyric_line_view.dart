@@ -45,6 +45,9 @@ class LyricLineView extends StatelessWidget {
   static const double _maxBlur = 3.5;
   static const Duration _duration = Duration(milliseconds: 520);
 
+  /// 减弱动效下仍保留的一段轻量高亮 / 淡入时长，让歌词"对焦"不至于生硬跳变。
+  static const Duration _reduceDuration = Duration(milliseconds: 200);
+
   @override
   Widget build(BuildContext context) {
     final d = distance.abs();
@@ -68,7 +71,7 @@ class LyricLineView extends StatelessWidget {
         padding: EdgeInsets.symmetric(vertical: fontSize * 0.4),
         child: TweenAnimationBuilder<_LineVisual>(
           tween: _LineVisualTween(end: _LineVisual(blur, opacity, scale)),
-          duration: context.motion(_duration),
+          duration: context.reduceMotion ? _reduceDuration : _duration,
           curve: Curves.easeOutCubic,
           builder: (context, v, _) {
             // 透明度直接写进文字颜色，省去 Opacity 的离屏图层

@@ -85,7 +85,13 @@ class _LyricsViewState extends State<LyricsView> {
 
   /// 切行滚动与间奏收起 / 展开共用的时长与曲线（两者同步，位置才不会跳）。
   static const Duration _scrollDuration = Duration(milliseconds: 560);
+
+  /// 减弱动效下的轻量时长：滚动仍平滑，但更短更克制，避免「跳行」的生硬感。
+  static const Duration _reduceScrollDuration = Duration(milliseconds: 260);
   static const Curve _scrollCurve = Cubic(0.22, 1.0, 0.36, 1.0);
+
+  /// 当前生效的切行时长（减弱动效时用更短的轻量时长）。
+  Duration get _scrollMotion => context.reduceMotion ? _reduceScrollDuration : _scrollDuration;
 
   /// 歌词区可视高度（由 LayoutBuilder 写入），用于把当前行对准"未被玻璃遮挡区域"的正中。
   double _viewportHeight = 0;
@@ -333,12 +339,8 @@ class _LyricsViewState extends State<LyricsView> {
       reveal - _focusTopY - collapsing,
     );
     if ((target - position.pixels).abs() < 0.5) return;
-    if (animate && !context.reduceMotion) {
-      position.animateTo(
-        target,
-        duration: _scrollDuration,
-        curve: _scrollCurve,
-      );
+    if (animate) {
+      position.animateTo(target, duration: _scrollMotion, curve: _scrollCurve);
     } else {
       position.jumpTo(target);
     }
@@ -582,7 +584,7 @@ class _LyricsViewState extends State<LyricsView> {
   /// 展开 / 收起与切行滚动同时长同曲线，配合 [_scrollToActive] 的收起补偿保持位置连贯。
   Widget _gapEntry(_Gap? gap, double fontSize, bool centered) {
     return AnimatedSize(
-      duration: context.motion(_scrollDuration),
+      duration: _scrollMotion,
       curve: _scrollCurve,
       clipBehavior: Clip.none,
       alignment: Alignment.topCenter,
