@@ -1,0 +1,60 @@
+# 仅供 fork 验证：用一次性密钥签出可安装的 Android APK。
+name: Fork APK
+on:
+  workflow_dispatch:
+  push:
+    branches: ['ci/**']
+permissions:
+  contents: read
+env:
+  FLUTTER_VERSION: '3.44.0'
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Patch flutter_inappwebview_android for AGP 9
+        run: |
+          root=$(grep -o '"rootUri": *"file://[^"]*flutter_inappwebview_android-[^"]*"' .dart_tool/package_config.json \
+            | sed -E 's/.*"file:\/\/([^"]*)"/\1/')
+          sed -i "s/proguard-android.txt/proguard-android-optimize.txt/g" "$root/android/build.gradle"
+          grep -n "proguard" "$root/android/build.gradle"
+      - name: Generate throwaway signing key
+        run: |
+          umask 077
+          keytool -genkeypair -keystore "$RUNNER_TEMP/fork.jks" -storetype JKS \
+            -alias flutify -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass flutify -keypass flutify -dname "CN=Flutify Fork, O=Fork, C=CN"
+          {
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/fork.jks"
+            echo "ANDROID_KEYSTORE_PASSWORD=flutify"
+            echo "ANDROID_KEY_ALIAS=flutify"
+            echo "ANDROID_KEY_PASSWORD=flutify"
+          } >> "$GITHUB_ENV"
+      - name: Build APK
+        run: |
+          flutter build apk --release --split-per-abi
+          flutter build apk --release
+      - name: Rename
+        run: |
+          cd build/app/outputs/flutter-apk
+          for f in app-*-release.apk; do
+            abi="${f#app-}"; abi="${abi%-release.apk}"
+            mv "$f" "Flutify-fork-android-$abi.apk"
+          done
+          mv app-release.apk "Flutify-fork-android-universal.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-fork
+          path: build/app/outputs/flutter-apk/Flutify-*.apk
